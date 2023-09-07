@@ -26,7 +26,6 @@ namespace Graphics.UI
         [SerializeField] private AnimationCurve _scaleCurve;
 
         [Header("Move Preferences")]
-        [SerializeField] private float _maxHookRange;
         [SerializeField] private AnimationCurve _moveCurve;
 
         [Header("Rotate Preferences")]
