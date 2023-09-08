@@ -69,13 +69,16 @@ namespace Graphics.UI
 
         private void Awake()
         {
-            _pool = new ObjectPool<GameObject>(() =>
+            _pool = new ObjectPool<GameObject>(
+                () =>
                 {
                     GameObject instance = Instantiate(_prefab, _rectTransform, true);
                     instance.AddComponent<CanvasGroup>();
+                    instance.SetActive(false);
                     return instance;
-                }
-                , defaultCapacity: 50, maxSize: 50000);
+                },
+                defaultCapacity: 5,
+                maxSize: 500);
         }
 
         private void OnDestroy()
