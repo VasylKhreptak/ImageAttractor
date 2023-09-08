@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using DG.Tweening;
 using Extensions;
+using PoolSystem;
 using UniRx;
 using UnityEngine;
-using UnityEngine.Pool;
 using Random = UnityEngine.Random;
 
 namespace Graphics.UI
@@ -57,7 +57,7 @@ namespace Graphics.UI
         private HashSet<Sequence> _sequences = new HashSet<Sequence>();
         private CompositeDisposable _delays = new CompositeDisposable();
 
-        private ObjectPool<GameObject> _pool;
+        private ObjectPool _pool;
 
         #region MonoBehaviour
 
@@ -69,21 +69,20 @@ namespace Graphics.UI
 
         private void Awake()
         {
-            _pool = new ObjectPool<GameObject>(
+            _pool = new ObjectPool(
                 () =>
                 {
                     GameObject instance = Instantiate(_prefab, _rectTransform, true);
                     instance.AddComponent<CanvasGroup>();
-                    instance.SetActive(false);
                     return instance;
                 },
-                defaultCapacity: 5,
-                maxSize: 500);
+                maxSize: 10000);
         }
 
         private void OnDestroy()
         {
             KillAll();
+            _pool.Clear();
         }
 
         public void Play(int count, Vector3 fromWorld, Transform toWorld, Action onComplete = null, Action onAllCompleted = null)
@@ -117,7 +116,6 @@ namespace Graphics.UI
         public void Play(Vector3 fromWorld, Transform toWorld, float range, Action onComplete = null)
         {
             GameObject instance = _pool.Get();
-            instance.SetActive(true);
             RectTransform rectTransform = instance.GetComponent<RectTransform>();
             CanvasGroup canvasGroup = instance.GetComponent<CanvasGroup>();
             rectTransform.SetParent(_rectTransform);
@@ -151,7 +149,6 @@ namespace Graphics.UI
                 .Join(CreateMoveTween(rectTransform, startAnchoredPosition, toWorld))
                 .OnComplete(() =>
                 {
-                    _pool.Release(instance);
                     instance.SetActive(false);
                     _sequences.Remove(sequence);
                     onComplete?.Invoke();
