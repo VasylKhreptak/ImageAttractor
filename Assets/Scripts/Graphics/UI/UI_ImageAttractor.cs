@@ -4,6 +4,7 @@ using DG.Tweening;
 using Extensions;
 using UniRx;
 using UnityEngine;
+using UnityEngine.Pool;
 using Random = UnityEngine.Random;
 
 namespace Graphics.UI
@@ -54,7 +55,9 @@ namespace Graphics.UI
         [SerializeField] private AnimationCurve _rangeCurve;
 
         private HashSet<Sequence> _sequences = new HashSet<Sequence>();
-        private CompositeDisposable _subscriptions = new CompositeDisposable();
+        private CompositeDisposable _delays = new CompositeDisposable();
+
+        private ObjectPool<GameObject> _pool;
 
         #region MonoBehaviour
 
@@ -62,6 +65,17 @@ namespace Graphics.UI
         {
             _rectTransform ??= GetComponent<RectTransform>();
             _canvas ??= FindObjectOfType<Canvas>();
+        }
+
+        private void Awake()
+        {
+            _pool = new ObjectPool<GameObject>(() =>
+                {
+                    GameObject instance = Instantiate(_prefab, _rectTransform, true);
+                    instance.AddComponent<CanvasGroup>();
+                    return instance;
+                }
+                , defaultCapacity: 50, maxSize: 50000);
         }
 
         private void OnDestroy()
@@ -91,7 +105,7 @@ namespace Graphics.UI
                             onAllCompleted?.Invoke();
                         }
                     });
-                }).AddTo(_subscriptions);
+                }).AddTo(_delays);
 
                 delay += interval;
             }
@@ -99,9 +113,10 @@ namespace Graphics.UI
 
         public void Play(Vector3 fromWorld, Transform toWorld, float range, Action onComplete = null)
         {
-            GameObject instance = Instantiate(_prefab, fromWorld, Quaternion.identity);
+            GameObject instance = _pool.Get();
+            instance.SetActive(true);
             RectTransform rectTransform = instance.GetComponent<RectTransform>();
-            CanvasGroup canvasGroup = instance.AddComponent<CanvasGroup>();
+            CanvasGroup canvasGroup = instance.GetComponent<CanvasGroup>();
             rectTransform.SetParent(_rectTransform);
 
             Vector3 centerAnchoredPosition = GetAnchoredPosition(fromWorld);
@@ -133,7 +148,8 @@ namespace Graphics.UI
                 .Join(CreateMoveTween(rectTransform, startAnchoredPosition, toWorld))
                 .OnComplete(() =>
                 {
-                    Destroy(instance);
+                    _pool.Release(instance);
+                    instance.SetActive(false);
                     _sequences.Remove(sequence);
                     onComplete?.Invoke();
                 })
@@ -182,7 +198,7 @@ namespace Graphics.UI
 
             _sequences.Clear();
 
-            _subscriptions.Clear();
+            _delays.Clear();
         }
 
         private Vector3 GetAnchoredPosition(Vector3 worldPoint)
